@@ -28,8 +28,9 @@
       # through unchanged.
       build = origPkgs:
         let
+          host = origPkgs.stdenv.hostPlatform;
           pkgsStatic =
-            if origPkgs.stdenv.hostPlatform.isDarwin
+            if host.isDarwin
             then origPkgs.pkgsStatic.extend (final: prev: {
               glib       = ulib.nativeFixes.glib       prev;
               graphite2  = ulib.nativeFixes.graphite2  prev;
@@ -41,6 +42,14 @@
               # file (native macos-14 runner included), tripping dav1d's
               # 'aarch64'-keyed asm dispatch. Same fix ffmpeg applies.
               dav1d      = ulib.nativeFixes.dav1d      prev;
+            })
+            # riscv64: libjpeg-turbo's RVV SIMD coverage helper fails to
+            # compile (see nix-lib/native-overlay/libjpeg-turbo.nix). Pulled
+            # via gdk-pixbuf → libtiff/libwebp. Gate to riscv so the other
+            # arches keep the unmodified (cache-hit) libjpeg.
+            else if host.isRiscV
+            then origPkgs.pkgsStatic.extend (final: prev: {
+              libjpeg = ulib.nativeFixes."libjpeg-turbo" prev;
             })
             else origPkgs.pkgsStatic;
         in
