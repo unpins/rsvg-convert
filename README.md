@@ -40,6 +40,10 @@ nix run github:unpins/rsvg-convert -- input.svg -o output.png
 
 The first invocation will offer to add the [unpins.cachix.org](https://unpins.cachix.org) substituter so most pulls come pre-built.
 
+## Man pages
+
+`rsvg-convert.1` is embedded in the binary — read with `unpin man rsvg-convert`. The same page rides in the Windows `rsvg-convert.exe`.
+
 ## Manual download
 
 The [Releases](https://github.com/unpins/rsvg-convert/releases) page has standalone binaries for manual download.
