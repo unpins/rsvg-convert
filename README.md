@@ -42,7 +42,7 @@ The first invocation will offer to add the [unpins.cachix.org](https://unpins.ca
 
 ## Man pages
 
-`rsvg-convert.1` is embedded in the binary — read with `unpin man rsvg-convert`. The same page rides in the Windows `rsvg-convert.exe`.
+`rsvg-convert.1` is embedded in the binary — read with `unpin man rsvg-convert`.
 
 ## Manual download
 
