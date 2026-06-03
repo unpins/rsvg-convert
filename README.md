@@ -11,18 +11,18 @@ Part of the [unpins](https://unpins.org) project — native single-binary builds
 
 Rasterizes or converts SVG documents to PNG, PDF, PS, EPS, or SVG.
 
-## Installation
+## Usage
 
-Install with [unpin](https://github.com/unpins/unpin):
+Run the `rsvg-convert` program with [unpin](https://github.com/unpins/unpin):
 
 ```bash
-unpin rsvg-convert
+unpin rsvg-convert in.svg -o out.png
 ```
 
-Or run without installing:
+To install it onto your PATH:
 
 ```bash
-unpin run rsvg-convert
+unpin install rsvg-convert
 ```
 
 ## Build locally
