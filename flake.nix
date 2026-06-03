@@ -108,7 +108,11 @@
             done
             cfg=$(grep -rl --include=config.toml 'crt-static' "$NIX_BUILD_TOP" | head -1)
             sed -i "s|-Ctarget-feature=-crt-static|-Ctarget-feature=+crt-static\", \"-Clink-arg=-Wl,--allow-multiple-definition\", \"-Lnative=$TMPDIR/static-rt|" "$cfg"
-            export NIX_LDFLAGS_AFTER_x86_64_w64_mingw32="''${NIX_LDFLAGS_AFTER_x86_64_w64_mingw32:-} -lntdll -lkernel32"
+            # glib/gio's gwin32mount.c (pulled in statically via librsvg's rlib)
+            # calls SHGetDesktopFolder / SHBindToParent — both exported by
+            # shell32.dll. librsvg 2.62.1 (26.05) surfaces these in the static
+            # link; add -lshell32 so the __imp_ imports resolve.
+            export NIX_LDFLAGS_AFTER_x86_64_w64_mingw32="''${NIX_LDFLAGS_AFTER_x86_64_w64_mingw32:-} -lntdll -lkernel32 -lshell32"
           '';
         });
     };
