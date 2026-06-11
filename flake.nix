@@ -1,5 +1,5 @@
 {
-  description = "Standalone build of rsvg-convert (SVG → PNG/PDF/PS converter)";
+  description = "rsvg-convert (SVG → PNG/PDF/PS converter) as a single self-contained binary";
 
   nixConfig = {
     extra-substituters = [ "https://unpins.cachix.org" ];
