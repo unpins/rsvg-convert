@@ -18,6 +18,8 @@
     ulib.mkStandaloneFlake {
       inherit self;
       name = "rsvg-convert";
+      smoke = [ "--version" ];
+      smokePattern = "^rsvg-convert version [0-9]+\\.[0-9]+";
       pkgsAttr = "librsvg";
 
       # On darwin the transitive text/render chain (glib → harfbuzz,
