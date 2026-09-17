@@ -1,6 +1,6 @@
 # rsvg-convert
 
-[rsvg-convert](https://gitlab.gnome.org/GNOME/librsvg) — librsvg's SVG → PNG/PDF/PS/SVG converter CLI. A single self-contained binary, built natively for Linux, macOS, and Windows.
+[rsvg-convert](https://gitlab.gnome.org/GNOME/librsvg) — convert SVG images to PNG, PDF, PostScript, EPS or SVG. A single self-contained binary, built natively for Linux, macOS, and Windows.
 
 [![CI](https://github.com/unpins/rsvg-convert/actions/workflows/rsvg-convert.yml/badge.svg)](https://github.com/unpins/rsvg-convert/actions)
 ![Linux](https://img.shields.io/badge/Linux-✓-success?logo=linux&logoColor=white)
@@ -8,8 +8,6 @@
 ![Windows](https://img.shields.io/badge/Windows-✓-success?logo=windows&logoColor=white)
 
 Part of the [unpins](https://unpins.org) catalog; install it with [`unpin`](https://github.com/unpins/unpin): `unpin install rsvg-convert`.
-
-Rasterizes or converts SVG documents to PNG, PDF, PS, EPS, or SVG.
 
 ## Usage
 
@@ -27,7 +25,7 @@ unpin install rsvg-convert
 
 ## Man pages
 
-`rsvg-convert.1` is embedded in the binary — read with `unpin man rsvg-convert`.
+`rsvg-convert.1` is embedded in the binary — read it with `unpin man rsvg-convert`.
 
 ## Build locally
 
@@ -50,7 +48,6 @@ The [Releases](https://github.com/unpins/rsvg-convert/releases) page has standal
 
 ## Build notes
 
-- **Windows:** `mingw` cross, single `.exe`, no companion DLLs.
-- **No upstream features disabled** on any platform.
-
-Platform fixes live in [`nix-lib/native-overlay/librsvg.nix`](https://github.com/unpins/nix-lib/blob/main/native-overlay/librsvg.nix) and [`nix-lib/mingw-overlay/librsvg.nix`](https://github.com/unpins/nix-lib/blob/main/mingw-overlay/librsvg.nix).
+- **Images inside SVGs:** PNG, JPEG, GIF, WebP and AVIF.
+- **Text** uses the system's fonts: fontconfig on Linux, Core Text on macOS and
+  DirectWrite on Windows.

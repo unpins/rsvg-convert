@@ -21,6 +21,15 @@
       smoke = [ "--version" ];
       smokePattern = "^rsvg-convert version [0-9]+\\.[0-9]+";
       pkgsAttr = "librsvg";
+      # Data directories baked in by the libraries: fontconfig's config templates
+      # and nixpkgs' default font dir (dejavu), libxml2's XML catalog, glib's GIO
+      # module/locale/dbus paths, libthai's word-break dictionary (and pango's
+      # reference to it on i686). None exists off Nix, so the binary already
+      # runs without them; left alone they pulled all of these into the closure.
+      removeReferences = [
+        "fontconfig-static" "dejavu-fonts" "libxml2-static" "glib-static"
+        "libthai-static" "pango-static"
+      ];
 
       # On darwin the transitive text/render chain (glib → harfbuzz,
       # pango, cairo) needs the same cross-within-darwin fixes ffmpeg
@@ -55,7 +64,39 @@
             })
             else origPkgs.pkgsStatic;
         in
-        ulib.nativeFixes.librsvg pkgsStatic;
+        (ulib.nativeFixes.librsvg pkgsStatic).overrideAttrs (oa: {
+          # `--version` only proves the binary loads. Render a real document —
+          # shapes, text, an embedded PNG and JPEG — to PNG, PDF and SVG, on
+          # every target the build machine can run (i686 is never run in CI).
+          # The SVG output keeps an <image> only for a picture that decoded.
+          doInstallCheck = oa.doInstallCheck or false
+            || origPkgs.stdenv.buildPlatform.canExecute host;
+          installCheckPhase = ''
+            runHook preInstallCheck
+            r=$out/bin/rsvg-convert
+            cat > $TMPDIR/t.svg <<'SVG'
+            <svg xmlns="http://www.w3.org/2000/svg" width="64" height="32">
+              <rect width="64" height="32" fill="#36c"/><circle cx="16" cy="16" r="8" fill="red"/>
+              <text x="4" y="28" font-size="10">unpins</text>
+            </svg>
+            SVG
+            $r $TMPDIR/t.svg -o $TMPDIR/t.png
+            [ "$(od -An -tx1 -N24 $TMPDIR/t.png | tr -d ' \n')" = 89504e470d0a1a0a0000000d494844520000004000000020 ] \
+              || { echo "installCheck: PNG output is not a 64x32 PNG" >&2; exit 1; }
+            $r -f pdf $TMPDIR/t.svg -o $TMPDIR/t.pdf
+            [ "$(head -c 5 $TMPDIR/t.pdf)" = %PDF- ] || { echo "installCheck: PDF output is not a PDF" >&2; exit 1; }
+            # One picture per file: cairo may rasterize a page into a single
+            # <image>, so only "some image vs none" tells a decode apart.
+            for img in png:iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAACXBIWXMAAAABAAAAAQBPJcTWAAAAEElEQVR4nGP8ywACLGCSAQANEQED1LYyQAAAAABJRU5ErkJggg== jpeg:/9j/4AAQSkZJRgABAgAAAQABAAD//gAQTGF2YzYyLjI4LjEwMAD/2wBDAAgUFBcUFxsbGxsbGyAeICEhISAgICAhISEkJCQqKiokJCQhISQkKCgqKi4vLisrKisvLzIyMjw8OTlGRkhWVmf/xABMAAEBAAAAAAAAAAAAAAAAAAAABgEBAQAAAAAAAAAAAAAAAAAABgcQAQAAAAAAAAAAAAAAAAAAAAARAQAAAAAAAAAAAAAAAAAAAAD/wAARCAAIAAgDASIAAhEAAxEA/9oADAMBAAIRAxEAPwCLAE1/f//Z; do
+              printf '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"><image width="16" height="16" href="data:image/%s;base64,%s"/></svg>' \
+                "''${img%%:*}" "''${img#*:}" > $TMPDIR/i.svg
+              $r -f svg $TMPDIR/i.svg -o $TMPDIR/out.svg
+              grep -q '<image' $TMPDIR/out.svg \
+                || { echo "installCheck: the embedded ''${img%%:*} did not decode" >&2; exit 1; }
+            done
+            runHook postInstallCheck
+          '';
+        });
 
       # mingw-overlay/librsvg.nix (auto-applied by mingwStaticCross)
       # carries the cross-mingw library fixes: + winpthreads/mcfgthreads,
