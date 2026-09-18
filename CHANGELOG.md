@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Updated to librsvg 2.62.3.
+
 ### Fixed
 
 - `nix build` and `nix run` downloaded 43 MB for a 17 MB program: the binary
