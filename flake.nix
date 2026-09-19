@@ -58,11 +58,20 @@
             # compile (see nix-lib/native-overlay/libjpeg-turbo.nix). Pulled
             # via gdk-pixbuf → libtiff/libwebp. Gate to riscv so the other
             # arches keep the unmodified (cache-hit) libjpeg.
+            # graphite2 1.3.15 puts `python3.withPackages (…fonttools…)` in
+            # nativeBuildInputs; withPackages loses splicing, so it resolves
+            # to the static target python and fonttools' tests die on
+            # "Dynamic loading not supported". nativeFixes.graphite2 hands it
+            # the build python; this set is outside the engine, so nix-lib's
+            # auto-wired copy never reaches it.
             else if host.isRiscV
             then origPkgs.pkgsStatic.extend (final: prev: {
+              graphite2 = ulib.nativeFixes.graphite2 prev;
               libjpeg = ulib.nativeFixes."libjpeg-turbo" prev;
             })
-            else origPkgs.pkgsStatic;
+            else origPkgs.pkgsStatic.extend (final: prev: {
+              graphite2 = ulib.nativeFixes.graphite2 prev;
+            });
         in
         (ulib.nativeFixes.librsvg pkgsStatic).overrideAttrs (oa: {
           # `--version` only proves the binary loads. Render a real document —
