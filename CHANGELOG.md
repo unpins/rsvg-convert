@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [2.62.3-1] - 2026-09-26
+
 ### Changed
 
 - Updated to librsvg 2.62.3.
