@@ -160,7 +160,7 @@
       #
       # Result: a single rsvg-convert.exe importing only system DLLs.
       windowsBuild = pkgs:
-        (ulib.mingwStaticCross pkgs).librsvg.overrideAttrs (oa: {
+        (ulib.nativeFixes.librsvg (ulib.mingwStaticCross pkgs)).overrideAttrs (oa: {
           preBuild = (oa.preBuild or "") + ''
             mkdir -p "$TMPDIR/static-rt"
             for lib in libstdc++.a libmcfgthread.a; do
@@ -173,11 +173,7 @@
             grep -qF -- '-Ctarget-feature=-crt-static' "''${cfg:-/dev/null}" \
               || { echo "windowsBuild: no -crt-static in the generated cargo config" >&2; exit 1; }
             sed -i "s|-Ctarget-feature=-crt-static|-Ctarget-feature=+crt-static\", \"-Clink-arg=-Wl,--allow-multiple-definition\", \"-Lnative=$TMPDIR/static-rt|" "$cfg"
-            # glib/gio's gwin32mount.c (pulled in statically via librsvg's rlib)
-            # calls SHGetDesktopFolder / SHBindToParent — both exported by
-            # shell32.dll. librsvg 2.62.1 (26.05) surfaces these in the static
-            # link; add -lshell32 so the __imp_ imports resolve.
-            export NIX_LDFLAGS_AFTER_x86_64_w64_mingw32="''${NIX_LDFLAGS_AFTER_x86_64_w64_mingw32:-} -lntdll -lkernel32 -lshell32"
+            export NIX_LDFLAGS_AFTER_x86_64_w64_mingw32="''${NIX_LDFLAGS_AFTER_x86_64_w64_mingw32:-} -lntdll -lkernel32"
           '';
         });
     };
