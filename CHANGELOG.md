@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- The binary no longer names a Nix store path as libxml2's default XML
+  catalog; it now names `/etc/xml/catalog`, where Linux distributions keep it.
+
 ## [2.62.3-1] - 2026-09-26
 
 ### Changed

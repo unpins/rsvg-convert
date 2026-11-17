@@ -40,9 +40,9 @@
       build = origPkgs:
         let
           host = origPkgs.stdenv.hostPlatform;
-          pkgsStatic =
-            if host.isDarwin
-            then origPkgs.pkgsStatic.extend (final: prev: {
+          pkgsStatic = origPkgs.pkgsStatic.appendOverlays [
+            (if host.isDarwin
+            then (final: prev: {
               glib       = ulib.nativeFixes.glib       prev;
               graphite2  = ulib.nativeFixes.graphite2  prev;
               fontconfig = ulib.nativeFixes.fontconfig prev;
@@ -65,13 +65,22 @@
             # the build python; this set is outside the engine, so nix-lib's
             # auto-wired copy never reaches it.
             else if host.isRiscV
-            then origPkgs.pkgsStatic.extend (final: prev: {
+            then (final: prev: {
               graphite2 = ulib.nativeFixes.graphite2 prev;
               libjpeg = ulib.nativeFixes."libjpeg-turbo" prev;
             })
-            else origPkgs.pkgsStatic.extend (final: prev: {
+            else (final: prev: {
               graphite2 = ulib.nativeFixes.graphite2 prev;
-            });
+            }))
+            # This set is outside the engine, so nix-lib's autoWired libxml2
+            # fix (sysconfdir=/etc) never reaches it; without it the binary
+            # carries libxml2's store catalog path. Gated per stage: on darwin
+            # libxml2 is in the stdenv bootstrap, and an ungated override
+            # rebuilds the toolchain from source.
+            (final: prev:
+              if !(prev.stdenv.hostPlatform.isStatic or false) then { }
+              else { libxml2 = ulib.nativeFixes.libxml2 prev; })
+          ];
         in
         (ulib.nativeFixes.librsvg pkgsStatic).overrideAttrs (oa: {
           # `--version` only proves the binary loads. Render a real document —
