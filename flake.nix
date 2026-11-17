@@ -22,12 +22,12 @@
       smokePattern = "^rsvg-convert version [0-9]+\\.[0-9]+";
       pkgsAttr = "librsvg";
       # Data directories baked in by the libraries: fontconfig's config templates
-      # and nixpkgs' default font dir (dejavu), libxml2's XML catalog, glib's GIO
-      # module/locale/dbus paths, libthai's word-break dictionary (and pango's
-      # reference to it on i686). None exists off Nix, so the binary already
+      # and nixpkgs' default font dir (dejavu), glib's GIO module/locale/dbus
+      # paths, libthai's word-break dictionary (and pango's reference to it on
+      # i686). None exists off Nix, so the binary already
       # runs without them; left alone they pulled all of these into the closure.
       removeReferences = [
-        "fontconfig-static" "dejavu-fonts" "libxml2-static" "glib-static"
+        "fontconfig-static" "dejavu-fonts" "glib-static"
         "libthai-static" "pango-static"
       ];
 
