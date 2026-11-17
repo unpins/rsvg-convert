@@ -170,6 +170,8 @@
               [ -f "$src" ] && cp "$src" "$TMPDIR/static-rt/"
             done
             cfg=$(grep -rl --include=config.toml 'crt-static' "$NIX_BUILD_TOP" | head -1)
+            grep -qF -- '-Ctarget-feature=-crt-static' "''${cfg:-/dev/null}" \
+              || { echo "windowsBuild: no -crt-static in the generated cargo config" >&2; exit 1; }
             sed -i "s|-Ctarget-feature=-crt-static|-Ctarget-feature=+crt-static\", \"-Clink-arg=-Wl,--allow-multiple-definition\", \"-Lnative=$TMPDIR/static-rt|" "$cfg"
             # glib/gio's gwin32mount.c (pulled in statically via librsvg's rlib)
             # calls SHGetDesktopFolder / SHBindToParent — both exported by
