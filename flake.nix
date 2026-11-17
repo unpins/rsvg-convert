@@ -121,6 +121,8 @@
       # mingw-overlay/librsvg.nix (auto-applied by mingwStaticCross)
       # carries the cross-mingw library fixes: + winpthreads/mcfgthreads,
       # NIX_LDFLAGS_AFTER late-link for libintl, completion stubs.
+      # `nativeFixes.librsvg` adds the `-lshell32` glib's gwin32mount.c needs
+      # (fix 3b). What stays here is the three DLL leaks below.
       #
       # mingw single-binary policy. By default rsvg-convert.exe ships next
       # to libgcc_s_seh-1.dll, libstdc++-6.dll and libmcfgthread-2.dll.
