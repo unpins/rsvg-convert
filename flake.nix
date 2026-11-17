@@ -31,12 +31,14 @@
         "libthai-static" "pango-static"
       ];
 
-      # On darwin the transitive text/render chain (glib → harfbuzz,
-      # pango, cairo) needs the same cross-within-darwin fixes ffmpeg
-      # uses: glib/pango objc cross-file, graphite2 static-SONAME guard,
-      # fontconfig doCheck path-symlink, cairo ipc_rmid_deferred_release.
-      # Each fix short-circuits to prev.X off darwin, so linux passes
-      # through unchanged.
+      # This set is pristine pkgsStatic, outside the engine, so the fixes
+      # nix-lib autoWires there are applied here by hand. On darwin the
+      # text/render chain (glib → harfbuzz, pango, cairo) needs the same
+      # fixes ffmpeg uses: glib/pango objc cross-file, graphite2 build-time
+      # python (withPackages loses splicing), fontconfig with upstream's
+      # default font folders and its doCheck off, cairo
+      # ipc_rmid_deferred_release. Every static platform also gets the
+      # libxml2 layer below.
       build = origPkgs:
         let
           host = origPkgs.stdenv.hostPlatform;
