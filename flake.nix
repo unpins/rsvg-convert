@@ -8,11 +8,8 @@
 
   inputs.unpins-lib.url = "github:unpins/nix-lib";
 
-  # librsvg ships the `rsvg-convert` CLI. Shared `nativeFixes.librsvg`:
-  # (1) + libunwind (librsvg's rustc --print=native-static-libs emits
-  #     -lunwind on musl; pkgsStatic forces the static probe);
-  # (2) propagate pango (librsvg-2.0.pc Requires.private: pangocairo).
-  # See nix-lib/native-overlay/librsvg.nix.
+  # librsvg ships the `rsvg-convert` CLI. The library fixes it shares with
+  # chafa, ffmpeg and fpcalc live in nix-lib/native-overlay/librsvg.nix.
   outputs = { self, unpins-lib }:
     let ulib = unpins-lib.lib; in
     ulib.mkStandaloneFlake {
@@ -31,20 +28,19 @@
         "libthai-static" "pango-static"
       ];
 
-      # This set is pristine pkgsStatic, outside the engine, so the fixes
-      # nix-lib autoWires there are applied here by hand. On darwin the
-      # text/render chain (glib → harfbuzz, pango, cairo) needs the same
-      # fixes ffmpeg uses: glib/pango objc cross-file, graphite2 build-time
-      # python (withPackages loses splicing), fontconfig with upstream's
-      # default font folders and its doCheck off, cairo
-      # ipc_rmid_deferred_release. Every static platform also gets the
-      # libxml2 layer below.
+      # Linux builds librsvg in the engine set (the one chafa, ffmpeg and
+      # fpcalc link it from), with rust-overlay's prebuilt rustc. Darwin
+      # keeps a pristine pkgsStatic, outside the engine, so the fixes
+      # nix-lib autoWires there are applied here by hand. The text/render
+      # chain (glib → harfbuzz, pango, cairo) needs the same fixes ffmpeg
+      # uses: glib/pango objc cross-file, graphite2 build-time python
+      # (withPackages loses splicing), fontconfig with upstream's default
+      # font folders and its doCheck off, cairo ipc_rmid_deferred_release.
       build = origPkgs:
         let
           host = origPkgs.stdenv.hostPlatform;
-          pkgsStatic = origPkgs.pkgsStatic.appendOverlays [
-            (if host.isDarwin
-            then (final: prev: {
+          darwinStatic = origPkgs.pkgsStatic.appendOverlays [
+            (final: prev: {
               glib       = ulib.nativeFixes.glib       prev;
               graphite2  = ulib.nativeFixes.graphite2  prev;
               fontconfig = ulib.nativeFixes.fontconfig prev;
@@ -56,35 +52,23 @@
               # 'aarch64'-keyed asm dispatch. Same fix ffmpeg applies.
               dav1d      = ulib.nativeFixes.dav1d      prev;
             })
-            # riscv64: libjpeg-turbo's RVV SIMD coverage helper fails to
-            # compile (see nix-lib/native-overlay/libjpeg-turbo.nix). Pulled
-            # via gdk-pixbuf → libtiff/libwebp. Gate to riscv so the other
-            # arches keep the unmodified (cache-hit) libjpeg.
-            # graphite2 1.3.15 puts `python3.withPackages (…fonttools…)` in
-            # nativeBuildInputs; withPackages loses splicing, so it resolves
-            # to the static target python and fonttools' tests die on
-            # "Dynamic loading not supported". nativeFixes.graphite2 hands it
-            # the build python; this set is outside the engine, so nix-lib's
-            # auto-wired copy never reaches it.
-            else if host.isRiscV
-            then (final: prev: {
-              graphite2 = ulib.nativeFixes.graphite2 prev;
-              libjpeg = ulib.nativeFixes."libjpeg-turbo" prev;
-            })
-            else (final: prev: {
-              graphite2 = ulib.nativeFixes.graphite2 prev;
-            }))
-            # This set is outside the engine, so nix-lib's autoWired libxml2
-            # fix (sysconfdir=/etc) never reaches it; without it the binary
-            # carries libxml2's store catalog path. Gated per stage: on darwin
-            # libxml2 is in the stdenv bootstrap, and an ungated override
-            # rebuilds the toolchain from source.
+            # nix-lib's autoWired libxml2 fix (sysconfdir=/etc) never reaches
+            # this set; without it the binary carries libxml2's store catalog
+            # path. Gated per stage: libxml2 is in the darwin stdenv
+            # bootstrap, and an ungated override rebuilds the toolchain.
             (final: prev:
               if !(prev.stdenv.hostPlatform.isStatic or false) then { }
               else { libxml2 = ulib.nativeFixes.libxml2 prev; })
           ];
+          librsvg =
+            if host.isLinux
+            then (ulib.enginePkgsStaticFor {
+              pkgs = origPkgs;
+              toolchain = ulib.unpinToolchain origPkgs.stdenv.buildPlatform.system;
+            }).librsvg
+            else ulib.nativeFixes.librsvg darwinStatic;
         in
-        (ulib.nativeFixes.librsvg pkgsStatic).overrideAttrs (oa: {
+        librsvg.overrideAttrs (oa: {
           # `--version` only proves the binary loads. Render a real document —
           # shapes, text, an embedded PNG and JPEG — to PNG, PDF and SVG, on
           # every target the build machine can run (i686 is never run in CI).
@@ -118,65 +102,12 @@
           '';
         });
 
-      # mingw-overlay/librsvg.nix (auto-applied by mingwStaticCross)
-      # carries the cross-mingw library fixes: + winpthreads/mcfgthreads,
-      # NIX_LDFLAGS_AFTER late-link for libintl, completion stubs.
-      # `nativeFixes.librsvg` adds the `-lshell32` glib's gwin32mount.c needs
-      # (fix 3b). What stays here is the three DLL leaks below.
-      #
-      # mingw single-binary policy. By default rsvg-convert.exe ships next
-      # to libgcc_s_seh-1.dll, libstdc++-6.dll and libmcfgthread-2.dll.
-      # Three independent leaks, three fixes — all CLI-only (ffmpeg's C
-      # link never pulls these), so they stay out of nix-lib's overlay:
-      #
-      # 1. libgcc_s. cargoSetupHook writes the Rust target's `crt-static`
-      #    from `targetPlatform.isStatic`, but `mingwStaticCross` only
-      #    flips `hostPlatform.isStatic` (the white lie that makes C libs
-      #    build `.a`), so the config lands `-Ctarget-feature=-crt-static`
-      #    and rustc links the gnu runtime dynamically. Flip it to
-      #    `+crt-static` in the generated `.cargo/config.toml`.
-      #
-      # 2. libstdc++ + libmcfgthread. rustc still links these as `dylib`
-      #    kind: `-l stdc++` is emitted plain by a `-sys` build script (the
-      #    C++ runtime for harfbuzz/graphite2), and the mingw-overlay
-      #    appends `-lmcfgthread` via NIX_LDFLAGS_AFTER — neither carries
-      #    the `static=` prefix system-deps gives the rest, so both resolve
-      #    to `.dll.a` import libs. `+crt-static` doesn't touch them. Stage
-      #    static-only copies of `libstdc++.a`/`libmcfgthread.a` in a dir
-      #    and put it on the rustc link path via `-Lnative=`: rustc emits
-      #    user `-L` ahead of both NIX_LDFLAGS (mcfgthread's lib dir) and
-      #    gcc's internal dir (libstdc++'s `.dll.a`), and mingw ld tries
-      #    `libNAME.dll.a` then `libNAME.a` *per directory* — so a dir with
-      #    no `.dll.a` yields the static archive even under -Bdynamic.
-      #    Static `libmcfgthread.a` then needs ntdll/kernel32 directly (the
-      #    NT keyed-event + heap APIs the import DLL used to carry); append
-      #    `-lntdll -lkernel32` after the overlay's trailing `-lmcfgthread`
-      #    (single-pass ld, so they must follow it). Both are system DLLs.
-      #
-      # 3. `+crt-static` static-links libgcc, whose
-      #    ___chkstk_ms/__udivmodti4/__udivti3 then collide with the
-      #    compiler_builtins symbols Rust bundles in its own objects (the
-      #    COMDAT/weak marking doesn't survive the dual-static-archive
-      #    link). `-Wl,--allow-multiple-definition` is the canonical
-      #    mingw+Rust workaround — the same flag ffmpeg's librsvg link uses.
-      #
-      # Result: a single rsvg-convert.exe importing only system DLLs.
-      windowsBuild = pkgs:
-        (ulib.nativeFixes.librsvg (ulib.mingwStaticCross pkgs)).overrideAttrs (oa: {
-          preBuild = (oa.preBuild or "") + ''
-            mkdir -p "$TMPDIR/static-rt"
-            for lib in libstdc++.a libmcfgthread.a; do
-              src=$($CC -print-file-name=$lib)
-              [ -f "$src" ] || src=$(find /nix/store -maxdepth 3 \
-                -name "$lib" -path '*mingw32*' 2>/dev/null | head -1)
-              [ -f "$src" ] && cp "$src" "$TMPDIR/static-rt/"
-            done
-            cfg=$(grep -rl --include=config.toml 'crt-static' "$NIX_BUILD_TOP" | head -1)
-            grep -qF -- '-Ctarget-feature=-crt-static' "''${cfg:-/dev/null}" \
-              || { echo "windowsBuild: no -crt-static in the generated cargo config" >&2; exit 1; }
-            sed -i "s|-Ctarget-feature=-crt-static|-Ctarget-feature=+crt-static\", \"-Clink-arg=-Wl,--allow-multiple-definition\", \"-Lnative=$TMPDIR/static-rt|" "$cfg"
-            export NIX_LDFLAGS_AFTER_x86_64_w64_mingw32="''${NIX_LDFLAGS_AFTER_x86_64_w64_mingw32:-} -lntdll -lkernel32"
-          '';
-        });
+      # The engine's mingw set, the one chafa and ffmpeg link librsvg from:
+      # clang + lld, libc++/libunwind and rust's `-gnullvm` std, so no gcc
+      # runtime (libgcc, libstdc++, mcfgthread) exists to leak as a DLL.
+      # mingw-overlay/librsvg.nix (auto-applied by mingwStaticCross) and
+      # `nativeFixes.librsvg` carry the library fixes.
+      windowsBuild = _pkgs:
+        ulib.nativeFixes.librsvg (ulib.mingwStaticCross ulib.windowsEnginePkgsShared);
     };
 }
