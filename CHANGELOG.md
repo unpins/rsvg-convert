@@ -6,6 +6,10 @@
 
 - The binary no longer names a Nix store path as libxml2's default XML
   catalog; it now names `/etc/xml/catalog`, where Linux distributions keep it.
+- FreeType no longer looks for a HarfBuzz shared library at run time. It used
+  one, when the system had it, to hint glyphs such as small caps and
+  superscripts; that HarfBuzz is now built into the binary, so the result no
+  longer depends on what the system has installed.
 
 ## [2.62.3-1] - 2026-09-26
 

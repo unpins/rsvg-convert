@@ -56,9 +56,16 @@
             # this set; without it the binary carries libxml2's store catalog
             # path. Gated per stage: libxml2 is in the darwin stdenv
             # bootstrap, and an ungated override rebuilds the toolchain.
+            # Same for the freetype fix (harfbuzz linked into freetype, else
+            # its autohinter dlopens libharfbuzz at run time): ungated, the
+            # build machine's freetype would close a cycle through fontforge.
             (final: prev:
               if !(prev.stdenv.hostPlatform.isStatic or false) then { }
-              else { libxml2 = ulib.nativeFixes.libxml2 prev; })
+              else {
+                libxml2  = ulib.nativeFixes.libxml2  prev;
+                freetype = ulib.nativeFixes.freetype prev;
+                harfbuzz = final.freetype.unpinHarfbuzz;
+              })
           ];
           librsvg =
             if host.isLinux
